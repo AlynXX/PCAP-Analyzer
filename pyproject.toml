@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pcap-analyzer"
+version = "0.1.0"
+description = "Prosty analizator plikow PCAP/PCAPNG z Wiresharka."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "PCAP Analyzer" }]
+
+[project.scripts]
+pcap-analyzer = "pcap_analyzer.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pcap_analyzer*"]
