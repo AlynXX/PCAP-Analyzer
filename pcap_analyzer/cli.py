@@ -6,12 +6,14 @@ from pathlib import Path
 import sys
 
 from .analyzer import analyze_file
+from .report import write_html_report
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Analizator plikow PCAP/PCAPNG z Wiresharka.")
     parser.add_argument("file", help="Sciezka do pliku .pcap lub .pcapng")
     parser.add_argument("--json", action="store_true", help="Wypisz wynik jako JSON")
+    parser.add_argument("--html", metavar="REPORT.html", help="Zapisz raport HTML do wskazanego pliku")
     parser.add_argument("--limit", type=int, default=10, help="Limit pozycji w rankingach")
     args = parser.parse_args(argv)
 
@@ -30,6 +32,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))
     else:
         _print_human(result)
+    if args.html:
+        report_path = write_html_report(result, args.html)
+        print(f"\nRaport HTML zapisany: {report_path}")
     return 0
 
 
@@ -39,6 +44,7 @@ def _print_human(result) -> None:
     print(f"Pakiety: {result.packet_count}")
     print(f"Bajty: {result.byte_count}")
     print(f"Czas trwania: {result.duration_seconds:.3f} s")
+    print(f"Risk score: {result.risk_score}/100 ({result.risk_level})")
 
     print("\nNajczestsze protokoly:")
     for protocol, count in result.protocols:

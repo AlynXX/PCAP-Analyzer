@@ -38,6 +38,8 @@ class AnalysisResult:
     packet_count: int
     byte_count: int
     duration_seconds: float
+    risk_score: int
+    risk_level: str
     first_timestamp: float | None
     last_timestamp: float | None
     protocols: list[tuple[str, int]]
@@ -69,17 +71,22 @@ def analyze_file(path: str | Path, limit: int = 10) -> AnalysisResult:
         if connection:
             connections[connection] += 1
 
+    suspicious = _find_suspicious(packets, limit)
+    risk_score = _risk_score(suspicious)
+
     return AnalysisResult(
         file=str(path),
         packet_count=len(packets),
         byte_count=sum(packet.length for packet in packets),
         duration_seconds=(max(timestamps) - min(timestamps)) if len(timestamps) >= 2 else 0.0,
+        risk_score=risk_score,
+        risk_level=_risk_level(risk_score),
         first_timestamp=min(timestamps) if timestamps else None,
         last_timestamp=max(timestamps) if timestamps else None,
         protocols=protocol_counts.most_common(limit),
         top_talkers=talkers.most_common(limit),
         top_connections=connections.most_common(limit),
-        suspicious=_find_suspicious(packets, limit),
+        suspicious=suspicious,
     )
 
 
@@ -188,3 +195,21 @@ def _is_private(value: str) -> bool:
         return ipaddress.ip_address(value).is_private
     except ValueError:
         return False
+
+
+def _risk_score(findings: list[SuspiciousFinding]) -> int:
+    weights = {"niskie": 10, "srednie": 25, "wysokie": 70}
+    score = sum(weights.get(finding.severity, 15) for finding in findings)
+    if len(findings) >= 5:
+        score += 10
+    return min(score, 100)
+
+
+def _risk_level(score: int) -> str:
+    if score >= 70:
+        return "wysokie"
+    if score >= 35:
+        return "srednie"
+    if score > 0:
+        return "niskie"
+    return "brak"

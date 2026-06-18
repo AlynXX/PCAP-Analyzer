@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from pcap_analyzer.analyzer import analyze_file
+from pcap_analyzer.report import write_html_report
 
 
 def ethernet_ipv4_tcp(src: str, dst: str, sport: int, dport: int, flags: int = 0x02) -> bytes:
@@ -49,7 +50,24 @@ class AnalyzerTests(unittest.TestCase):
 
             self.assertEqual(result.packet_count, 21)
             self.assertEqual(result.protocols[0], ("TCP", 21))
+            self.assertEqual(result.risk_score, 70)
+            self.assertEqual(result.risk_level, "wysokie")
             self.assertTrue(any("skanowanie" in finding.title.lower() for finding in result.suspicious))
+
+    def test_writes_html_report(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            pcap_path = Path(tmp) / "scan.pcap"
+            report_path = Path(tmp) / "report.html"
+            frames = [ethernet_ipv4_tcp("10.0.0.5", "10.0.0.10", 40000 + port, port) for port in range(1, 22)]
+            write_pcap(pcap_path, frames)
+
+            result = analyze_file(pcap_path)
+            write_html_report(result, report_path)
+
+            html = report_path.read_text(encoding="utf-8")
+            self.assertIn("PCAP Analyzer Report", html)
+            self.assertIn("70/100", html)
+            self.assertIn("Mozliwe skanowanie portow", html)
 
 
 if __name__ == "__main__":
