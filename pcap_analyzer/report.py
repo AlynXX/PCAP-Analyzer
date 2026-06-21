@@ -135,6 +135,7 @@ def render_html_report(result: AnalysisResult) -> str:
       <div>
         <h1>PCAP Analyzer Report</h1>
         <p class="muted">Plik: {escape(result.file)}<br>Wygenerowano: {escape(generated_at)}</p>
+        {_filters_summary(result)}
       </div>
       <div class="risk">
         <div class="muted">Risk score</div>
@@ -178,6 +179,13 @@ def render_html_report(result: AnalysisResult) -> str:
 
 def _metric(label: str, value: str) -> str:
     return f'<div class="metric"><span class="muted">{escape(label)}</span><strong>{escape(value)}</strong></div>'
+
+
+def _filters_summary(result: AnalysisResult) -> str:
+    if not result.filters:
+        return ""
+    filters = ", ".join(f"{name}={value}" for name, value in result.filters.items())
+    return f'<p class="muted">Filtry: {escape(filters)}</p>'
 
 
 def _pairs_table(left_label: str, right_label: str, rows: list[tuple[str, int]]) -> str:

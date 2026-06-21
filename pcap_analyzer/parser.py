@@ -28,6 +28,7 @@ class ParsedPacket:
     dst_ip: str | None = None
     ip_version: int | None = None
     transport: str | None = None
+    application: str | None = None
     src_port: int | None = None
     dst_port: int | None = None
     tcp_flags: int | None = None
@@ -35,6 +36,8 @@ class ParsedPacket:
 
     @property
     def protocol_label(self) -> str:
+        if self.application:
+            return self.application
         if self.transport:
             return self.transport
         if self.l2_protocol:
@@ -186,12 +189,68 @@ def _parse_transport(
     if proto == 6 and len(data) >= offset + 20:
         src_port, dst_port = struct.unpack("!HH", data[offset : offset + 4])
         flags = data[offset + 13]
-        return ParsedPacket(raw.timestamp, len(data), raw.link_type, l2_protocol, src_ip, dst_ip, ip_version, "TCP", src_port, dst_port, flags)
+        application = _application_protocol("TCP", src_port, dst_port)
+        return ParsedPacket(
+            raw.timestamp,
+            len(data),
+            raw.link_type,
+            l2_protocol,
+            src_ip,
+            dst_ip,
+            ip_version,
+            "TCP",
+            application,
+            src_port,
+            dst_port,
+            flags,
+        )
     if proto == 17 and len(data) >= offset + 8:
         src_port, dst_port = struct.unpack("!HH", data[offset : offset + 4])
-        return ParsedPacket(raw.timestamp, len(data), raw.link_type, l2_protocol, src_ip, dst_ip, ip_version, "UDP", src_port, dst_port)
+        application = _application_protocol("UDP", src_port, dst_port)
+        return ParsedPacket(raw.timestamp, len(data), raw.link_type, l2_protocol, src_ip, dst_ip, ip_version, "UDP", application, src_port, dst_port)
     if proto == 1 and len(data) >= offset + 1:
         return ParsedPacket(raw.timestamp, len(data), raw.link_type, l2_protocol, src_ip, dst_ip, ip_version, "ICMP", icmp_type=data[offset])
     if proto == 58 and len(data) >= offset + 1:
         return ParsedPacket(raw.timestamp, len(data), raw.link_type, l2_protocol, src_ip, dst_ip, ip_version, "ICMPv6", icmp_type=data[offset])
     return ParsedPacket(raw.timestamp, len(data), raw.link_type, l2_protocol, src_ip, dst_ip, ip_version, f"IP_PROTO_{proto}")
+
+
+def _application_protocol(transport: str, src_port: int, dst_port: int) -> str | None:
+    tcp_ports = {
+        20: "FTP-DATA",
+        21: "FTP",
+        22: "SSH",
+        23: "Telnet",
+        25: "SMTP",
+        53: "DNS",
+        80: "HTTP",
+        110: "POP3",
+        143: "IMAP",
+        443: "HTTPS",
+        445: "SMB",
+        587: "SMTP",
+        993: "IMAPS",
+        995: "POP3S",
+        1433: "MSSQL",
+        3306: "MySQL",
+        3389: "RDP",
+        5432: "PostgreSQL",
+        5900: "VNC",
+        8080: "HTTP-ALT",
+    }
+    udp_ports = {
+        53: "DNS",
+        67: "DHCP",
+        68: "DHCP",
+        69: "TFTP",
+        123: "NTP",
+        137: "NetBIOS",
+        138: "NetBIOS",
+        161: "SNMP",
+        162: "SNMP",
+        500: "IKE",
+        1900: "SSDP",
+        5353: "mDNS",
+    }
+    ports = tcp_ports if transport == "TCP" else udp_ports
+    return ports.get(dst_port) or ports.get(src_port)

@@ -33,8 +33,16 @@ class SuspiciousFinding:
 
 
 @dataclass(frozen=True)
+class AnalysisFilters:
+    host: str | None = None
+    protocol: str | None = None
+    port: int | None = None
+
+
+@dataclass(frozen=True)
 class AnalysisResult:
     file: str
+    filters: dict[str, object]
     packet_count: int
     byte_count: int
     duration_seconds: float
@@ -57,6 +65,27 @@ class AnalysisResult:
 
 def analyze_file(path: str | Path, limit: int = 10) -> AnalysisResult:
     packets = [parse_packet(raw) for raw in read_packets(path)]
+    return analyze_packets(path, packets, limit=limit)
+
+
+def analyze_filtered_file(
+    path: str | Path,
+    limit: int = 10,
+    host: str | None = None,
+    protocol: str | None = None,
+    port: int | None = None,
+) -> AnalysisResult:
+    filters = AnalysisFilters(host=host, protocol=protocol, port=port)
+    packets = [packet for packet in (parse_packet(raw) for raw in read_packets(path)) if _matches_filters(packet, filters)]
+    return analyze_packets(path, packets, limit=limit, filters=filters)
+
+
+def analyze_packets(
+    path: str | Path,
+    packets: list[ParsedPacket],
+    limit: int = 10,
+    filters: AnalysisFilters | None = None,
+) -> AnalysisResult:
     timestamps = [packet.timestamp for packet in packets if packet.timestamp > 0]
 
     protocol_counts = Counter(packet.protocol_label for packet in packets)
@@ -76,6 +105,7 @@ def analyze_file(path: str | Path, limit: int = 10) -> AnalysisResult:
 
     return AnalysisResult(
         file=str(path),
+        filters=_filters_to_dict(filters),
         packet_count=len(packets),
         byte_count=sum(packet.length for packet in packets),
         duration_seconds=(max(timestamps) - min(timestamps)) if len(timestamps) >= 2 else 0.0,
@@ -88,6 +118,37 @@ def analyze_file(path: str | Path, limit: int = 10) -> AnalysisResult:
         top_connections=connections.most_common(limit),
         suspicious=suspicious,
     )
+
+
+def _matches_filters(packet: ParsedPacket, filters: AnalysisFilters) -> bool:
+    if filters.host and filters.host not in {packet.src_ip, packet.dst_ip}:
+        return False
+    if filters.port and filters.port not in {packet.src_port, packet.dst_port}:
+        return False
+    if filters.protocol:
+        expected = filters.protocol.upper()
+        labels = {
+            packet.protocol_label.upper(),
+            (packet.transport or "").upper(),
+            (packet.application or "").upper(),
+            (packet.l2_protocol or "").upper(),
+        }
+        if expected not in labels:
+            return False
+    return True
+
+
+def _filters_to_dict(filters: AnalysisFilters | None) -> dict[str, object]:
+    if filters is None:
+        return {}
+    data: dict[str, object] = {}
+    if filters.host:
+        data["host"] = filters.host
+    if filters.protocol:
+        data["protocol"] = filters.protocol
+    if filters.port:
+        data["port"] = filters.port
+    return data
 
 
 def _find_suspicious(packets: list[ParsedPacket], limit: int) -> list[SuspiciousFinding]:
@@ -187,7 +248,8 @@ def _connection_label(packet: ParsedPacket) -> str | None:
         return None
     left = f"{packet.src_ip}:{packet.src_port}" if packet.src_port else packet.src_ip
     right = f"{packet.dst_ip}:{packet.dst_port}" if packet.dst_port else packet.dst_ip
-    return f"{left} -> {right} {packet.transport or packet.l2_protocol or ''}".strip()
+    protocol = packet.application or packet.transport or packet.l2_protocol or ""
+    return f"{left} -> {right} {protocol}".strip()
 
 
 def _is_private(value: str) -> bool:

@@ -5,7 +5,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pcap_analyzer.analyzer import analyze_file
+from pcap_analyzer.analyzer import analyze_file, analyze_filtered_file
+from pcap_analyzer.csv_export import write_csv_exports
 from pcap_analyzer.report import write_html_report
 
 
@@ -49,10 +50,33 @@ class AnalyzerTests(unittest.TestCase):
             result = analyze_file(path)
 
             self.assertEqual(result.packet_count, 21)
-            self.assertEqual(result.protocols[0], ("TCP", 21))
+            self.assertEqual(result.protocols[0], ("TCP", 19))
+            self.assertIn(("FTP", 1), result.protocols)
             self.assertEqual(result.risk_score, 70)
             self.assertEqual(result.risk_level, "wysokie")
             self.assertTrue(any("skanowanie" in finding.title.lower() for finding in result.suspicious))
+
+    def test_classifies_application_protocols_and_filters(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "web.pcap"
+            frames = [
+                ethernet_ipv4_tcp("10.0.0.5", "93.184.216.34", 50000, 443),
+                ethernet_ipv4_tcp("10.0.0.5", "93.184.216.34", 50001, 80),
+                ethernet_ipv4_tcp("10.0.0.9", "10.0.0.10", 50002, 22),
+            ]
+            write_pcap(path, frames)
+
+            result = analyze_file(path)
+            filtered = analyze_filtered_file(path, protocol="HTTPS")
+            host_filtered = analyze_filtered_file(path, host="10.0.0.9")
+            port_filtered = analyze_filtered_file(path, port=80)
+
+            self.assertIn(("HTTPS", 1), result.protocols)
+            self.assertIn(("HTTP", 1), result.protocols)
+            self.assertEqual(filtered.packet_count, 1)
+            self.assertEqual(filtered.protocols, [("HTTPS", 1)])
+            self.assertEqual(host_filtered.packet_count, 1)
+            self.assertEqual(port_filtered.protocols, [("HTTP", 1)])
 
     def test_writes_html_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -68,6 +92,20 @@ class AnalyzerTests(unittest.TestCase):
             self.assertIn("PCAP Analyzer Report", html)
             self.assertIn("70/100", html)
             self.assertIn("Mozliwe skanowanie portow", html)
+
+    def test_writes_csv_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            pcap_path = Path(tmp) / "web.pcap"
+            csv_dir = Path(tmp) / "csv"
+            frames = [ethernet_ipv4_tcp("10.0.0.5", "93.184.216.34", 50000, 443)]
+            write_pcap(pcap_path, frames)
+
+            result = analyze_file(pcap_path)
+            write_csv_exports(result, csv_dir)
+
+            self.assertTrue((csv_dir / "summary.csv").exists())
+            self.assertTrue((csv_dir / "protocols.csv").exists())
+            self.assertIn("HTTPS", (csv_dir / "protocols.csv").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

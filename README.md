@@ -10,6 +10,9 @@ Funkcje:
 - ranking najaktywniejszych hostow i najczestszych polaczen,
 - prosty risk score w skali 0-100,
 - raport HTML z podsumowaniem i tabelami,
+- eksport CSV,
+- filtrowanie po hoscie, protokole i porcie,
+- rozpoznawanie popularnych protokolow aplikacyjnych po portach,
 - wykrywanie podejrzanych wzorcow: skanowanie portow, duzo pakietow SYN, ruch do uslug podwyzszonego ryzyka, nietypowo duzo DNS.
 
 ## Uruchomienie
@@ -28,6 +31,20 @@ Raport HTML:
 
 ```powershell
 python -m pcap_analyzer sample.pcap --html report.html
+```
+
+Eksport CSV:
+
+```powershell
+python -m pcap_analyzer sample.pcap --csv wyniki
+```
+
+Filtrowanie:
+
+```powershell
+python -m pcap_analyzer sample.pcap --host 192.168.1.10
+python -m pcap_analyzer sample.pcap --protocol HTTPS
+python -m pcap_analyzer sample.pcap --port 443
 ```
 
 Po instalacji pakietu lokalnie dostepna jest tez komenda:
