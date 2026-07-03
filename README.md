@@ -9,10 +9,14 @@ Funkcje:
 - ranking najczestszych protokolow,
 - ranking najaktywniejszych hostow i najczestszych polaczen,
 - analiza sesji/flow z liczba pakietow, bajtow i czasem trwania,
+- eksport pelnej listy pakietow do CSV,
+- wykrywanie prostych anomalii czasowych,
 - prosty risk score w skali 0-100,
-- raport HTML z podsumowaniem i tabelami,
+- raport HTML z podsumowaniem, tabelami i prostymi wykresami,
 - eksport CSV,
 - filtrowanie po hoscie, protokole i porcie,
+- porownywanie dwoch plikow PCAP,
+- generator przykladowego PCAP,
 - rozpoznawanie popularnych protokolow aplikacyjnych po portach,
 - wykrywanie podejrzanych wzorcow: skanowanie portow, duzo pakietow SYN, ruch do uslug podwyzszonego ryzyka, nietypowo duzo DNS.
 
@@ -41,7 +45,7 @@ python -m pcap_analyzer sample.pcap --csv wyniki
 ```
 
 Eksport CSV tworzy pliki: `summary.csv`, `protocols.csv`, `talkers.csv`,
-`connections.csv`, `flows.csv` i `suspicious.csv`.
+`connections.csv`, `flows.csv`, `packets.csv` i `suspicious.csv`.
 
 Filtrowanie:
 
@@ -49,6 +53,24 @@ Filtrowanie:
 python -m pcap_analyzer sample.pcap --host 192.168.1.10
 python -m pcap_analyzer sample.pcap --protocol HTTPS
 python -m pcap_analyzer sample.pcap --port 443
+```
+
+Krotkie podsumowanie bez tabel:
+
+```powershell
+python -m pcap_analyzer sample.pcap --summary-only
+```
+
+Porownanie dwoch plikow:
+
+```powershell
+python -m pcap_analyzer before.pcap --compare after.pcap
+```
+
+Przykladowy PCAP do demonstracji:
+
+```powershell
+python -m pcap_analyzer --generate-sample sample.pcap
 ```
 
 Po instalacji pakietu lokalnie dostepna jest tez komenda:

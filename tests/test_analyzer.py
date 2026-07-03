@@ -6,8 +6,10 @@ import unittest
 from pathlib import Path
 
 from pcap_analyzer.analyzer import analyze_file, analyze_filtered_file
+from pcap_analyzer.compare import compare_results
 from pcap_analyzer.csv_export import write_csv_exports
 from pcap_analyzer.report import write_html_report
+from pcap_analyzer.sample import generate_sample_pcap
 
 
 def ethernet_ipv4_tcp(src: str, dst: str, sport: int, dport: int, flags: int = 0x02) -> bytes:
@@ -32,11 +34,14 @@ def ethernet_ipv4_tcp(src: str, dst: str, sport: int, dport: int, flags: int = 0
     return eth + ip + tcp
 
 
-def write_pcap(path: Path, frames: list[bytes]) -> None:
+def write_pcap(path: Path, frames: list[bytes], timestamps: list[float] | None = None) -> None:
     header = struct.pack("<IHHiiii", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1)
     records = []
     for index, frame in enumerate(frames):
-        records.append(struct.pack("<IIII", index, 0, len(frame), len(frame)) + frame)
+        timestamp = timestamps[index] if timestamps else float(index)
+        seconds = int(timestamp)
+        micros = int((timestamp - seconds) * 1_000_000)
+        records.append(struct.pack("<IIII", seconds, micros, len(frame), len(frame)) + frame)
     path.write_bytes(header + b"".join(records))
 
 
@@ -96,6 +101,7 @@ class AnalyzerTests(unittest.TestCase):
             self.assertIn("70/100", html)
             self.assertIn("Mozliwe skanowanie portow", html)
             self.assertIn("Najwieksze sesje / flow", html)
+            self.assertIn('class="bar"', html)
 
     def test_writes_csv_exports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -110,8 +116,41 @@ class AnalyzerTests(unittest.TestCase):
             self.assertTrue((csv_dir / "summary.csv").exists())
             self.assertTrue((csv_dir / "protocols.csv").exists())
             self.assertTrue((csv_dir / "flows.csv").exists())
+            self.assertTrue((csv_dir / "packets.csv").exists())
             self.assertIn("HTTPS", (csv_dir / "protocols.csv").read_text(encoding="utf-8"))
             self.assertIn("93.184.216.34:443", (csv_dir / "flows.csv").read_text(encoding="utf-8"))
+            self.assertIn("93.184.216.34", (csv_dir / "packets.csv").read_text(encoding="utf-8"))
+
+    def test_detects_temporal_burst(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "burst.pcap"
+            frames = [ethernet_ipv4_tcp("10.0.0.5", "10.0.0.10", 50000 + index, 443) for index in range(55)]
+            write_pcap(path, frames, timestamps=[1.001 + (index / 100000) for index in range(55)])
+
+            result = analyze_file(path)
+
+            self.assertTrue(any("burst" in finding.title.lower() for finding in result.suspicious))
+
+    def test_generates_sample_pcap_and_compares_results(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base_path = Path(tmp) / "base.pcap"
+            other_path = Path(tmp) / "other.pcap"
+            sample_path = Path(tmp) / "sample.pcap"
+            write_pcap(base_path, [ethernet_ipv4_tcp("10.0.0.5", "93.184.216.34", 50000, 443)])
+            write_pcap(
+                other_path,
+                [
+                    ethernet_ipv4_tcp("10.0.0.5", "93.184.216.34", 50000, 443),
+                    ethernet_ipv4_tcp("10.0.0.9", "10.0.0.10", 50001, 22),
+                ],
+            )
+
+            generate_sample_pcap(sample_path)
+            comparison = compare_results(analyze_file(base_path), analyze_file(other_path))
+
+            self.assertGreater(analyze_file(sample_path).packet_count, 0)
+            self.assertIn("10.0.0.9", comparison.new_hosts)
+            self.assertIn(22, comparison.new_ports)
 
 
 if __name__ == "__main__":

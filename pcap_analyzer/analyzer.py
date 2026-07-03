@@ -44,6 +44,20 @@ class FlowSummary:
 
 
 @dataclass(frozen=True)
+class PacketSummary:
+    timestamp: float
+    length: int
+    src_ip: str | None
+    src_port: int | None
+    dst_ip: str | None
+    dst_port: int | None
+    transport: str | None
+    application: str | None
+    protocol: str
+    tcp_flags: int | None
+
+
+@dataclass(frozen=True)
 class AnalysisFilters:
     host: str | None = None
     protocol: str | None = None
@@ -65,6 +79,7 @@ class AnalysisResult:
     top_talkers: list[tuple[str, int]]
     top_connections: list[tuple[str, int]]
     top_flows: list[FlowSummary]
+    packets: list[PacketSummary]
     suspicious: list[SuspiciousFinding]
 
     def to_dict(self) -> dict[str, object]:
@@ -73,6 +88,7 @@ class AnalysisResult:
         data["top_talkers"] = [{"host": host, "packets": count} for host, count in self.top_talkers]
         data["top_connections"] = [{"connection": conn, "packets": count} for conn, count in self.top_connections]
         data["top_flows"] = [asdict(flow) for flow in self.top_flows]
+        data["packets"] = [asdict(packet) for packet in self.packets]
         return data
 
 
@@ -120,6 +136,7 @@ def analyze_packets(
     suspicious = _find_suspicious(packets, limit)
     risk_score = _risk_score(suspicious)
     top_flows = _summarize_flows(flow_packets, limit)
+    packet_summaries = [_packet_summary(packet) for packet in packets]
 
     return AnalysisResult(
         file=str(path),
@@ -135,6 +152,7 @@ def analyze_packets(
         top_talkers=talkers.most_common(limit),
         top_connections=connections.most_common(limit),
         top_flows=top_flows,
+        packets=packet_summaries,
         suspicious=suspicious,
     )
 
@@ -177,10 +195,14 @@ def _find_suspicious(packets: list[ParsedPacket], limit: int) -> list[Suspicious
     risky_hits: Counter[tuple[str, str, int, str]] = Counter()
     syn_without_ack: Counter[str] = Counter()
     dns_hosts: Counter[str] = Counter()
+    packets_per_second: Counter[int] = Counter()
 
     for packet in packets:
         if not packet.src_ip or not packet.dst_ip:
             continue
+
+        if packet.timestamp > 0:
+            packets_per_second[int(packet.timestamp)] += 1
 
         if packet.dst_port:
             ports_by_src[packet.src_ip].add(packet.dst_port)
@@ -259,7 +281,35 @@ def _find_suspicious(packets: list[ParsedPacket], limit: int) -> list[Suspicious
                 )
             )
 
+    if packets_per_second:
+        second, count = packets_per_second.most_common(1)[0]
+        threshold = max(50, int(len(packets) * 0.40))
+        if count >= threshold:
+            findings.append(
+                SuspiciousFinding(
+                    "srednie",
+                    "Nagly burst pakietow",
+                    f"W sekundzie {second} wykryto {count} pakietow.",
+                    {"timestamp_second": second, "packets": count, "threshold": threshold},
+                )
+            )
+
     return findings[:limit]
+
+
+def _packet_summary(packet: ParsedPacket) -> PacketSummary:
+    return PacketSummary(
+        timestamp=packet.timestamp,
+        length=packet.length,
+        src_ip=packet.src_ip,
+        src_port=packet.src_port,
+        dst_ip=packet.dst_ip,
+        dst_port=packet.dst_port,
+        transport=packet.transport,
+        application=packet.application,
+        protocol=packet.protocol_label,
+        tcp_flags=packet.tcp_flags,
+    )
 
 
 def _connection_label(packet: ParsedPacket) -> str | None:

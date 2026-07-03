@@ -14,6 +14,7 @@ def write_csv_exports(result: AnalysisResult, output_dir: str | Path) -> Path:
     _write_pairs(path / "talkers.csv", ("host", "packets"), result.top_talkers)
     _write_pairs(path / "connections.csv", ("connection", "packets"), result.top_connections)
     _write_flows(path / "flows.csv", result)
+    _write_packets(path / "packets.csv", result)
     _write_suspicious(path / "suspicious.csv", result)
     _write_summary(path / "summary.csv", result)
     return path
@@ -58,6 +59,41 @@ def _write_flows(path: Path, result: AnalysisResult) -> None:
                     "first_timestamp": flow.first_timestamp,
                     "last_timestamp": flow.last_timestamp,
                     "duration_seconds": f"{flow.duration_seconds:.3f}",
+                }
+            )
+
+
+def _write_packets(path: Path, result: AnalysisResult) -> None:
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(
+            file,
+            fieldnames=[
+                "timestamp",
+                "length",
+                "src_ip",
+                "src_port",
+                "dst_ip",
+                "dst_port",
+                "transport",
+                "application",
+                "protocol",
+                "tcp_flags",
+            ],
+        )
+        writer.writeheader()
+        for packet in result.packets:
+            writer.writerow(
+                {
+                    "timestamp": packet.timestamp,
+                    "length": packet.length,
+                    "src_ip": packet.src_ip,
+                    "src_port": packet.src_port,
+                    "dst_ip": packet.dst_ip,
+                    "dst_port": packet.dst_port,
+                    "transport": packet.transport,
+                    "application": packet.application,
+                    "protocol": packet.protocol,
+                    "tcp_flags": packet.tcp_flags,
                 }
             )
 

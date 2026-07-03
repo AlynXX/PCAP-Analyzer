@@ -100,6 +100,18 @@ def render_html_report(result: AnalysisResult) -> str:
     }}
     th {{ color: var(--muted); font-weight: 700; }}
     tr:last-child td {{ border-bottom: 0; }}
+    .bar-cell {{ min-width: 160px; }}
+    .bar {{
+      height: 9px;
+      border-radius: 999px;
+      background: #e8eef8;
+      overflow: hidden;
+    }}
+    .bar span {{
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }}
     .badge {{
       display: inline-block;
       padding: 3px 8px;
@@ -159,11 +171,11 @@ def render_html_report(result: AnalysisResult) -> str:
     <div class="two-col">
       <section>
         <h2>Najczestsze protokoly</h2>
-        {_pairs_table("Protokol", "Pakiety", result.protocols)}
+        {_bars_table("Protokol", "Pakiety", result.protocols)}
       </section>
       <section>
         <h2>Najaktywniejsze hosty</h2>
-        {_pairs_table("Host", "Pakiety", result.top_talkers)}
+        {_bars_table("Host", "Pakiety", result.top_talkers)}
       </section>
     </div>
 
@@ -198,6 +210,24 @@ def _pairs_table(left_label: str, right_label: str, rows: list[tuple[str, int]])
         return '<p class="muted">Brak danych.</p>'
     body = "\n".join(f"<tr><td>{escape(str(left))}</td><td>{count}</td></tr>" for left, count in rows)
     return f"<table><thead><tr><th>{escape(left_label)}</th><th>{escape(right_label)}</th></tr></thead><tbody>{body}</tbody></table>"
+
+
+def _bars_table(left_label: str, right_label: str, rows: list[tuple[str, int]]) -> str:
+    if not rows:
+        return '<p class="muted">Brak danych.</p>'
+    max_count = max(count for _left, count in rows) or 1
+    body = "\n".join(
+        "<tr>"
+        f"<td>{escape(str(left))}</td>"
+        f"<td>{count}</td>"
+        f'<td class="bar-cell"><div class="bar"><span style="width: {(count / max_count) * 100:.1f}%"></span></div></td>'
+        "</tr>"
+        for left, count in rows
+    )
+    return (
+        f"<table><thead><tr><th>{escape(left_label)}</th><th>{escape(right_label)}</th><th>Udzial</th></tr></thead>"
+        f"<tbody>{body}</tbody></table>"
+    )
 
 
 def _findings_table(result: AnalysisResult) -> str:
