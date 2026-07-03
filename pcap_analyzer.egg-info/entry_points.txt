@@ -1,0 +1,2 @@
+[console_scripts]
+pcap-analyzer = pcap_analyzer.cli:main

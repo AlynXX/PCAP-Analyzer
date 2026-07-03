@@ -1,3 +1,16 @@
+Metadata-Version: 2.4
+Name: pcap-analyzer
+Version: 0.1.0
+Summary: Prosty analizator plikow PCAP/PCAPNG z Wiresharka.
+Author: PCAP Analyzer
+Keywords: pcap,wireshark,security,network,ids
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Topic :: Security
+Classifier: Topic :: System :: Networking :: Monitoring
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+
 # PCAP Analyzer
 
 PCAP Analyzer to lokalne narzedzie do analizy plikow z Wiresharka (`.pcap` i
@@ -29,31 +42,31 @@ ruchu wystepuja podejrzane wzorce.
 Instalacja:
 
 ```powershell
-python -m pip install .
+pip install .
 ```
 
 Tryb developerski:
 
 ```powershell
-python -m pip install -e .
+pip install -e .
 ```
 
 Wygenerowanie przykladowego PCAP:
 
 ```powershell
-python -m pcap_analyzer --generate-sample sample.pcap
+pcap-analyzer --generate-sample sample.pcap
 ```
 
 Analiza w terminalu:
 
 ```powershell
-python -m pcap_analyzer sample.pcap
+pcap-analyzer sample.pcap
 ```
 
 Krotkie podsumowanie:
 
 ```powershell
-python -m pcap_analyzer sample.pcap --summary-only
+pcap-analyzer sample.pcap --summary-only
 ```
 
 Przykladowy wynik:
@@ -72,7 +85,7 @@ Risk score: 95/100 (wysokie)
 Uruchom lokalny interfejs webowy:
 
 ```powershell
-python -m pcap_analyzer --gui
+pcap-analyzer --gui
 ```
 
 Nastepnie otworz:
@@ -84,34 +97,24 @@ http://127.0.0.1:8080
 GUI pozwala wgrac plik PCAP/PCAPNG, ustawic filtry, zobaczyc raport HTML oraz
 pobrac wynik jako JSON albo paczke ZIP z CSV.
 
-### Podglad Analizy W GUI
-
-![PCAP Analyzer GUI - raport z analizy](docs/images/gui-analysis-report.png)
-
-Przykladowy raport pokazuje wynik analizy pliku PCAP z ruchem FTP. Widac tu
-wysoki risk score, podstawowe metryki przechwycenia, alerty `PORT_SCAN`,
-`SYN_FLOOD` i `RISKY_SERVICE`, a takze wykresy najczestszych protokolow oraz
-najaktywniejszych hostow. Gorne linki pozwalaja pobrac wynik jako JSON, pobrac
-paczke CSV albo uruchomic nowa analize.
-
 ## Raporty I Eksport
 
 Raport HTML:
 
 ```powershell
-python -m pcap_analyzer sample.pcap --html report.html
+pcap-analyzer sample.pcap --html report.html
 ```
 
 JSON:
 
 ```powershell
-python -m pcap_analyzer sample.pcap --json
+pcap-analyzer sample.pcap --json
 ```
 
 CSV:
 
 ```powershell
-python -m pcap_analyzer sample.pcap --csv wyniki
+pcap-analyzer sample.pcap --csv wyniki
 ```
 
 Eksport CSV tworzy:
@@ -127,9 +130,9 @@ Eksport CSV tworzy:
 ## Filtrowanie
 
 ```powershell
-python -m pcap_analyzer sample.pcap --host 192.168.1.10
-python -m pcap_analyzer sample.pcap --protocol HTTPS
-python -m pcap_analyzer sample.pcap --port 443
+pcap-analyzer sample.pcap --host 192.168.1.10
+pcap-analyzer sample.pcap --protocol HTTPS
+pcap-analyzer sample.pcap --port 443
 ```
 
 Filtry dzialaja dla terminala, JSON, HTML, CSV i GUI.
@@ -137,7 +140,7 @@ Filtry dzialaja dla terminala, JSON, HTML, CSV i GUI.
 ## Porownywanie Plikow
 
 ```powershell
-python -m pcap_analyzer before.pcap --compare after.pcap
+pcap-analyzer before.pcap --compare after.pcap
 ```
 
 Porownanie pokazuje roznice liczby pakietow, bajtow, risk score oraz nowe hosty,
