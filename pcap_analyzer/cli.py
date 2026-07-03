@@ -115,7 +115,7 @@ def _print_human(result, summary_only: bool = False) -> None:
     if not result.suspicious:
         print("  - Brak wykrytych anomalii wedlug prostych heurystyk.")
     for finding in result.suspicious:
-        print(f"  - [{finding.severity}] {finding.title}: {finding.details}")
+        print(f"  - [{finding.severity}] {finding.rule_id} {finding.title}: {finding.details}")
 
 
 def _print_comparison(comparison) -> None:

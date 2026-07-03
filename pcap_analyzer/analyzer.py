@@ -2,34 +2,10 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
-import ipaddress
 from pathlib import Path
 
 from .parser import ParsedPacket, parse_packet, read_packets
-
-
-RISKY_PORTS = {
-    21: "FTP",
-    22: "SSH",
-    23: "Telnet",
-    25: "SMTP",
-    53: "DNS",
-    110: "POP3",
-    135: "MS RPC",
-    139: "NetBIOS",
-    143: "IMAP",
-    445: "SMB",
-    3389: "RDP",
-    5900: "VNC",
-}
-
-
-@dataclass(frozen=True)
-class SuspiciousFinding:
-    severity: str
-    title: str
-    details: str
-    evidence: dict[str, object]
+from .rules import SuspiciousFinding, detect_suspicious
 
 
 @dataclass(frozen=True)
@@ -133,7 +109,7 @@ def analyze_packets(
         if flow_key:
             flow_packets[flow_key].append(packet)
 
-    suspicious = _find_suspicious(packets, limit)
+    suspicious = detect_suspicious(packets, limit)
     risk_score = _risk_score(suspicious)
     top_flows = _summarize_flows(flow_packets, limit)
     packet_summaries = [_packet_summary(packet) for packet in packets]
@@ -186,115 +162,6 @@ def _filters_to_dict(filters: AnalysisFilters | None) -> dict[str, object]:
     if filters.port:
         data["port"] = filters.port
     return data
-
-
-def _find_suspicious(packets: list[ParsedPacket], limit: int) -> list[SuspiciousFinding]:
-    findings: list[SuspiciousFinding] = []
-    ports_by_src: dict[str, set[int]] = defaultdict(set)
-    hosts_by_src: dict[str, set[str]] = defaultdict(set)
-    risky_hits: Counter[tuple[str, str, int, str]] = Counter()
-    syn_without_ack: Counter[str] = Counter()
-    dns_hosts: Counter[str] = Counter()
-    packets_per_second: Counter[int] = Counter()
-
-    for packet in packets:
-        if not packet.src_ip or not packet.dst_ip:
-            continue
-
-        if packet.timestamp > 0:
-            packets_per_second[int(packet.timestamp)] += 1
-
-        if packet.dst_port:
-            ports_by_src[packet.src_ip].add(packet.dst_port)
-            hosts_by_src[packet.src_ip].add(packet.dst_ip)
-
-        if packet.dst_port in RISKY_PORTS:
-            risky_hits[(packet.src_ip, packet.dst_ip, packet.dst_port, RISKY_PORTS[packet.dst_port])] += 1
-
-        if packet.transport == "TCP" and packet.tcp_flags is not None:
-            syn = bool(packet.tcp_flags & 0x02)
-            ack = bool(packet.tcp_flags & 0x10)
-            if syn and not ack:
-                syn_without_ack[packet.src_ip] += 1
-
-        if packet.dst_port == 53:
-            dns_hosts[packet.src_ip] += 1
-
-    for src, ports in sorted(ports_by_src.items(), key=lambda item: len(item[1]), reverse=True)[:limit]:
-        hosts = hosts_by_src[src]
-        if len(ports) >= 20 or (len(ports) >= 10 and len(hosts) >= 5):
-            findings.append(
-                SuspiciousFinding(
-                    "wysokie",
-                    "Mozliwe skanowanie portow",
-                    f"Host {src} laczyl sie z {len(ports)} portami na {len(hosts)} hostach.",
-                    {"src_ip": src, "unique_ports": len(ports), "unique_hosts": len(hosts), "sample_ports": sorted(ports)[:15]},
-                )
-            )
-
-    for src, count in syn_without_ack.most_common(limit):
-        if count >= 30:
-            findings.append(
-                SuspiciousFinding(
-                    "srednie",
-                    "Duza liczba pakietow TCP SYN",
-                    f"Host {src} wyslal {count} pakietow SYN bez flagi ACK.",
-                    {"src_ip": src, "syn_packets": count},
-                )
-            )
-
-    for (src, dst, port, service), count in risky_hits.most_common(limit):
-        if count >= 3 or port in {23, 445, 3389, 5900}:
-            findings.append(
-                SuspiciousFinding(
-                    "srednie",
-                    f"Ruch do uslugi podwyzszonego ryzyka: {service}",
-                    f"{src} -> {dst}:{port} ({count} pakietow).",
-                    {"src_ip": src, "dst_ip": dst, "dst_port": port, "service": service, "packets": count},
-                )
-            )
-
-    for src, count in dns_hosts.most_common(limit):
-        if count >= 100:
-            findings.append(
-                SuspiciousFinding(
-                    "niskie",
-                    "Nietypowo duzo zapytan DNS",
-                    f"Host {src} wyslal {count} pakietow do portu DNS.",
-                    {"src_ip": src, "dns_packets": count},
-                )
-            )
-
-    external_to_private = Counter(
-        (packet.src_ip, packet.dst_ip, packet.dst_port)
-        for packet in packets
-        if packet.src_ip and packet.dst_ip and packet.dst_port and not _is_private(packet.src_ip) and _is_private(packet.dst_ip)
-    )
-    for (src, dst, port), count in external_to_private.most_common(limit):
-        if count >= 3:
-            findings.append(
-                SuspiciousFinding(
-                    "srednie",
-                    "Polaczenie z zewnatrz do adresu prywatnego",
-                    f"{src} -> {dst}:{port} ({count} pakietow).",
-                    {"src_ip": src, "dst_ip": dst, "dst_port": port, "packets": count},
-                )
-            )
-
-    if packets_per_second:
-        second, count = packets_per_second.most_common(1)[0]
-        threshold = max(50, int(len(packets) * 0.40))
-        if count >= threshold:
-            findings.append(
-                SuspiciousFinding(
-                    "srednie",
-                    "Nagly burst pakietow",
-                    f"W sekundzie {second} wykryto {count} pakietow.",
-                    {"timestamp_second": second, "packets": count, "threshold": threshold},
-                )
-            )
-
-    return findings[:limit]
 
 
 def _packet_summary(packet: ParsedPacket) -> PacketSummary:
@@ -350,14 +217,6 @@ def _summarize_flows(flow_packets: dict[tuple[str, str, str], list[ParsedPacket]
             )
         )
     return sorted(flows, key=lambda flow: (flow.packets, flow.bytes), reverse=True)[:limit]
-
-
-def _is_private(value: str) -> bool:
-    try:
-        return ipaddress.ip_address(value).is_private
-    except ValueError:
-        return False
-
 
 def _risk_score(findings: list[SuspiciousFinding]) -> int:
     weights = {"niskie": 10, "srednie": 25, "wysokie": 70}

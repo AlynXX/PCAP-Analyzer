@@ -23,6 +23,18 @@ Funkcje:
 
 ## Uruchomienie
 
+Instalacja:
+
+```powershell
+pip install .
+```
+
+Tryb developerski:
+
+```powershell
+pip install -e .
+```
+
 ```powershell
 python -m pcap_analyzer sample.pcap
 ```
@@ -85,9 +97,13 @@ python -m pcap_analyzer --generate-sample sample.pcap
 Po instalacji pakietu lokalnie dostepna jest tez komenda:
 
 ```powershell
-pip install -e .
 pcap-analyzer sample.pcap
 ```
+
+## Dokumentacja
+
+Opis architektury, algorytmow, regulek IDS-like i ograniczen znajduje sie w
+[`docs/technical.md`](docs/technical.md).
 
 ## Testy
 

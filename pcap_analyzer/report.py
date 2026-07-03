@@ -238,11 +238,12 @@ def _findings_table(result: AnalysisResult) -> str:
         rows.append(
             "<tr>"
             f'<td><span class="badge {escape(finding.severity)}">{escape(finding.severity)}</span></td>'
+            f"<td>{escape(finding.rule_id)}</td>"
             f"<td>{escape(finding.title)}</td>"
             f"<td>{escape(finding.details)}</td>"
             "</tr>"
         )
-    return "<table><thead><tr><th>Poziom</th><th>Alert</th><th>Szczegoly</th></tr></thead><tbody>" + "\n".join(rows) + "</tbody></table>"
+    return "<table><thead><tr><th>Poziom</th><th>Regula</th><th>Alert</th><th>Szczegoly</th></tr></thead><tbody>" + "\n".join(rows) + "</tbody></table>"
 
 
 def _flows_table(result: AnalysisResult) -> str:

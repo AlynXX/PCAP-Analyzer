@@ -29,12 +29,13 @@ def _write_pairs(path: Path, header: tuple[str, str], rows: list[tuple[str, int]
 
 def _write_suspicious(path: Path, result: AnalysisResult) -> None:
     with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=["severity", "title", "details", "evidence"])
+        writer = csv.DictWriter(file, fieldnames=["rule_id", "severity", "title", "details", "evidence"])
         writer.writeheader()
         for finding in result.suspicious:
             writer.writerow(
                 {
                     "severity": finding.severity,
+                    "rule_id": finding.rule_id,
                     "title": finding.title,
                     "details": finding.details,
                     "evidence": json.dumps(finding.evidence, ensure_ascii=False),

@@ -9,6 +9,13 @@ description = "Prosty analizator plikow PCAP/PCAPNG z Wiresharka."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [{ name = "PCAP Analyzer" }]
+keywords = ["pcap", "wireshark", "security", "network", "ids"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Security",
+  "Topic :: System :: Networking :: Monitoring",
+]
 
 [project.scripts]
 pcap-analyzer = "pcap_analyzer.cli:main"

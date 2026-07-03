@@ -132,6 +132,25 @@ class AnalyzerTests(unittest.TestCase):
 
             self.assertTrue(any("burst" in finding.title.lower() for finding in result.suspicious))
 
+    def test_detects_ids_like_tcp_scan_rules(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tcp_scans.pcap"
+            frames = [
+                *(ethernet_ipv4_tcp("10.0.0.6", "10.0.0.20", 41000 + index, 80, flags=0x00) for index in range(3)),
+                *(ethernet_ipv4_tcp("10.0.0.7", "10.0.0.20", 42000 + index, 80, flags=0x29) for index in range(3)),
+                *(ethernet_ipv4_tcp("10.0.0.8", "10.0.0.20", 43000 + index, 80, flags=0x01) for index in range(5)),
+                ethernet_ipv4_tcp("10.0.0.9", "10.0.0.20", 44000, 445),
+            ]
+            write_pcap(path, frames)
+
+            result = analyze_file(path, limit=20)
+            rule_ids = {finding.rule_id for finding in result.suspicious}
+
+            self.assertIn("NULL_SCAN", rule_ids)
+            self.assertIn("XMAS_SCAN", rule_ids)
+            self.assertIn("FIN_SCAN", rule_ids)
+            self.assertIn("SMB_OR_RDP_EXPOSURE", rule_ids)
+
     def test_generates_sample_pcap_and_compares_results(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base_path = Path(tmp) / "base.pcap"
