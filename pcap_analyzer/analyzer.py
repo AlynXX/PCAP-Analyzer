@@ -33,6 +33,17 @@ class SuspiciousFinding:
 
 
 @dataclass(frozen=True)
+class FlowSummary:
+    flow: str
+    protocol: str
+    packets: int
+    bytes: int
+    first_timestamp: float | None
+    last_timestamp: float | None
+    duration_seconds: float
+
+
+@dataclass(frozen=True)
 class AnalysisFilters:
     host: str | None = None
     protocol: str | None = None
@@ -53,6 +64,7 @@ class AnalysisResult:
     protocols: list[tuple[str, int]]
     top_talkers: list[tuple[str, int]]
     top_connections: list[tuple[str, int]]
+    top_flows: list[FlowSummary]
     suspicious: list[SuspiciousFinding]
 
     def to_dict(self) -> dict[str, object]:
@@ -60,6 +72,7 @@ class AnalysisResult:
         data["protocols"] = [{"protocol": name, "packets": count} for name, count in self.protocols]
         data["top_talkers"] = [{"host": host, "packets": count} for host, count in self.top_talkers]
         data["top_connections"] = [{"connection": conn, "packets": count} for conn, count in self.top_connections]
+        data["top_flows"] = [asdict(flow) for flow in self.top_flows]
         return data
 
 
@@ -91,6 +104,7 @@ def analyze_packets(
     protocol_counts = Counter(packet.protocol_label for packet in packets)
     talkers: Counter[str] = Counter()
     connections: Counter[str] = Counter()
+    flow_packets: dict[tuple[str, str, str], list[ParsedPacket]] = defaultdict(list)
     for packet in packets:
         if packet.src_ip:
             talkers[packet.src_ip] += 1
@@ -99,9 +113,13 @@ def analyze_packets(
         connection = _connection_label(packet)
         if connection:
             connections[connection] += 1
+        flow_key = _flow_key(packet)
+        if flow_key:
+            flow_packets[flow_key].append(packet)
 
     suspicious = _find_suspicious(packets, limit)
     risk_score = _risk_score(suspicious)
+    top_flows = _summarize_flows(flow_packets, limit)
 
     return AnalysisResult(
         file=str(path),
@@ -116,6 +134,7 @@ def analyze_packets(
         protocols=protocol_counts.most_common(limit),
         top_talkers=talkers.most_common(limit),
         top_connections=connections.most_common(limit),
+        top_flows=top_flows,
         suspicious=suspicious,
     )
 
@@ -250,6 +269,37 @@ def _connection_label(packet: ParsedPacket) -> str | None:
     right = f"{packet.dst_ip}:{packet.dst_port}" if packet.dst_port else packet.dst_ip
     protocol = packet.application or packet.transport or packet.l2_protocol or ""
     return f"{left} -> {right} {protocol}".strip()
+
+
+def _flow_key(packet: ParsedPacket) -> tuple[str, str, str] | None:
+    if not packet.src_ip or not packet.dst_ip:
+        return None
+    src = f"{packet.src_ip}:{packet.src_port}" if packet.src_port else packet.src_ip
+    dst = f"{packet.dst_ip}:{packet.dst_port}" if packet.dst_port else packet.dst_ip
+    left, right = sorted((src, dst))
+    protocol = packet.application or packet.transport or packet.l2_protocol or "UNKNOWN"
+    return left, right, protocol
+
+
+def _summarize_flows(flow_packets: dict[tuple[str, str, str], list[ParsedPacket]], limit: int) -> list[FlowSummary]:
+    flows: list[FlowSummary] = []
+    for (left, right, protocol), packets in flow_packets.items():
+        timestamps = [packet.timestamp for packet in packets if packet.timestamp > 0]
+        first_timestamp = min(timestamps) if timestamps else None
+        last_timestamp = max(timestamps) if timestamps else None
+        duration = (last_timestamp - first_timestamp) if first_timestamp is not None and last_timestamp is not None else 0.0
+        flows.append(
+            FlowSummary(
+                flow=f"{left} <-> {right}",
+                protocol=protocol,
+                packets=len(packets),
+                bytes=sum(packet.length for packet in packets),
+                first_timestamp=first_timestamp,
+                last_timestamp=last_timestamp,
+                duration_seconds=duration,
+            )
+        )
+    return sorted(flows, key=lambda flow: (flow.packets, flow.bytes), reverse=True)[:limit]
 
 
 def _is_private(value: str) -> bool:

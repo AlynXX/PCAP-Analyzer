@@ -69,6 +69,12 @@ def _print_human(result) -> None:
     for connection, count in result.top_connections:
         print(f"  - {connection}: {count}")
 
+    print("\nNajwieksze sesje / flow:")
+    if not result.top_flows:
+        print("  - Brak danych o sesjach.")
+    for flow in result.top_flows:
+        print(f"  - {flow.flow} {flow.protocol}: {flow.packets} pakietow, {flow.bytes} bajtow, {flow.duration_seconds:.3f} s")
+
     print("\nPodejrzane polaczenia:")
     if not result.suspicious:
         print("  - Brak wykrytych anomalii wedlug prostych heurystyk.")

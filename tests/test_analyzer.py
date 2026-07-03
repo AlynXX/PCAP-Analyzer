@@ -54,6 +54,7 @@ class AnalyzerTests(unittest.TestCase):
             self.assertIn(("FTP", 1), result.protocols)
             self.assertEqual(result.risk_score, 70)
             self.assertEqual(result.risk_level, "wysokie")
+            self.assertEqual(result.top_flows[0].packets, 1)
             self.assertTrue(any("skanowanie" in finding.title.lower() for finding in result.suspicious))
 
     def test_classifies_application_protocols_and_filters(self) -> None:
@@ -77,6 +78,8 @@ class AnalyzerTests(unittest.TestCase):
             self.assertEqual(filtered.protocols, [("HTTPS", 1)])
             self.assertEqual(host_filtered.packet_count, 1)
             self.assertEqual(port_filtered.protocols, [("HTTP", 1)])
+            self.assertEqual(result.top_flows[0].flow, "10.0.0.5:50000 <-> 93.184.216.34:443")
+            self.assertEqual(result.top_flows[0].protocol, "HTTPS")
 
     def test_writes_html_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -92,6 +95,7 @@ class AnalyzerTests(unittest.TestCase):
             self.assertIn("PCAP Analyzer Report", html)
             self.assertIn("70/100", html)
             self.assertIn("Mozliwe skanowanie portow", html)
+            self.assertIn("Najwieksze sesje / flow", html)
 
     def test_writes_csv_exports(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -105,7 +109,9 @@ class AnalyzerTests(unittest.TestCase):
 
             self.assertTrue((csv_dir / "summary.csv").exists())
             self.assertTrue((csv_dir / "protocols.csv").exists())
+            self.assertTrue((csv_dir / "flows.csv").exists())
             self.assertIn("HTTPS", (csv_dir / "protocols.csv").read_text(encoding="utf-8"))
+            self.assertIn("93.184.216.34:443", (csv_dir / "flows.csv").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

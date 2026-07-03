@@ -171,6 +171,11 @@ def render_html_report(result: AnalysisResult) -> str:
       <h2>Najczestsze polaczenia</h2>
       {_pairs_table("Polaczenie", "Pakiety", result.top_connections)}
     </section>
+
+    <section>
+      <h2>Najwieksze sesje / flow</h2>
+      {_flows_table(result)}
+    </section>
   </main>
 </body>
 </html>
@@ -208,6 +213,27 @@ def _findings_table(result: AnalysisResult) -> str:
             "</tr>"
         )
     return "<table><thead><tr><th>Poziom</th><th>Alert</th><th>Szczegoly</th></tr></thead><tbody>" + "\n".join(rows) + "</tbody></table>"
+
+
+def _flows_table(result: AnalysisResult) -> str:
+    if not result.top_flows:
+        return '<p class="muted">Brak danych o sesjach.</p>'
+    rows = []
+    for flow in result.top_flows:
+        rows.append(
+            "<tr>"
+            f"<td>{escape(flow.flow)}</td>"
+            f"<td>{escape(flow.protocol)}</td>"
+            f"<td>{flow.packets}</td>"
+            f"<td>{flow.bytes}</td>"
+            f"<td>{flow.duration_seconds:.3f} s</td>"
+            "</tr>"
+        )
+    return (
+        "<table><thead><tr><th>Flow</th><th>Protokol</th><th>Pakiety</th><th>Bajty</th><th>Czas</th></tr></thead><tbody>"
+        + "\n".join(rows)
+        + "</tbody></table>"
+    )
 
 
 def _risk_color(level: str) -> str:

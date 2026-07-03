@@ -8,6 +8,7 @@ Funkcje:
 - statystyki liczby pakietow, bajtow i czasu trwania przechwycenia,
 - ranking najczestszych protokolow,
 - ranking najaktywniejszych hostow i najczestszych polaczen,
+- analiza sesji/flow z liczba pakietow, bajtow i czasem trwania,
 - prosty risk score w skali 0-100,
 - raport HTML z podsumowaniem i tabelami,
 - eksport CSV,
@@ -38,6 +39,9 @@ Eksport CSV:
 ```powershell
 python -m pcap_analyzer sample.pcap --csv wyniki
 ```
+
+Eksport CSV tworzy pliki: `summary.csv`, `protocols.csv`, `talkers.csv`,
+`connections.csv`, `flows.csv` i `suspicious.csv`.
 
 Filtrowanie:
 
