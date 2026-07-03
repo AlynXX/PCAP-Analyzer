@@ -8,6 +8,7 @@ import sys
 from .analyzer import analyze_filtered_file
 from .compare import compare_results
 from .csv_export import write_csv_exports
+from .gui import run_gui
 from .report import write_html_report
 from .sample import generate_sample_pcap
 
@@ -20,12 +21,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--csv", metavar="DIR", help="Zapisz tabele CSV do wskazanego katalogu")
     parser.add_argument("--compare", metavar="OTHER.pcap", help="Porownaj analizowany plik z drugim plikiem PCAP/PCAPNG")
     parser.add_argument("--generate-sample", metavar="sample.pcap", help="Wygeneruj przykladowy plik PCAP do demonstracji")
+    parser.add_argument("--gui", action="store_true", help="Uruchom lokalny interfejs webowy")
+    parser.add_argument("--gui-host", default="127.0.0.1", help="Host dla GUI")
+    parser.add_argument("--gui-port", type=int, default=8080, help="Port dla GUI")
     parser.add_argument("--summary-only", action="store_true", help="Pokaz tylko podstawowe podsumowanie bez rankingow")
     parser.add_argument("--host", help="Analizuj tylko pakiety z podanym hostem jako zrodlem lub celem")
     parser.add_argument("--protocol", help="Analizuj tylko wybrany protokol, np. TCP, UDP, HTTP, HTTPS, DNS")
     parser.add_argument("--port", type=int, help="Analizuj tylko pakiety z podanym portem zrodlowym lub docelowym")
     parser.add_argument("--limit", type=int, default=10, help="Limit pozycji w rankingach")
     args = parser.parse_args(argv)
+
+    if args.gui:
+        run_gui(args.gui_host, args.gui_port)
+        return 0
 
     if args.generate_sample:
         sample_path = generate_sample_pcap(args.generate_sample)

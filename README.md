@@ -13,6 +13,7 @@ Funkcje:
 - wykrywanie prostych anomalii czasowych,
 - prosty risk score w skali 0-100,
 - raport HTML z podsumowaniem, tabelami i prostymi wykresami,
+- lokalny interfejs webowy do uploadu i analizy pliku,
 - eksport CSV,
 - filtrowanie po hoscie, protokole i porcie,
 - porownywanie dwoch plikow PCAP,
@@ -37,6 +38,14 @@ Raport HTML:
 ```powershell
 python -m pcap_analyzer sample.pcap --html report.html
 ```
+
+Lokalne GUI:
+
+```powershell
+python -m pcap_analyzer --gui
+```
+
+Nastepnie otworz w przegladarce `http://127.0.0.1:8080`.
 
 Eksport CSV:
 

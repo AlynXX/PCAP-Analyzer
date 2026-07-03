@@ -8,6 +8,7 @@ from pathlib import Path
 from pcap_analyzer.analyzer import analyze_file, analyze_filtered_file
 from pcap_analyzer.compare import compare_results
 from pcap_analyzer.csv_export import write_csv_exports
+from pcap_analyzer.gui import parse_multipart, render_upload_page
 from pcap_analyzer.report import write_html_report
 from pcap_analyzer.sample import generate_sample_pcap
 
@@ -151,6 +152,26 @@ class AnalyzerTests(unittest.TestCase):
             self.assertGreater(analyze_file(sample_path).packet_count, 0)
             self.assertIn("10.0.0.9", comparison.new_hosts)
             self.assertIn(22, comparison.new_ports)
+
+    def test_gui_helpers_render_and_parse_upload(self) -> None:
+        boundary = "----pcap-boundary"
+        body = (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="host"\r\n\r\n'
+            "10.0.0.5\r\n"
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="pcap"; filename="sample.pcap"\r\n'
+            "Content-Type: application/octet-stream\r\n\r\n"
+        ).encode("utf-8") + b"abc123\r\n" + f"--{boundary}--\r\n".encode("utf-8")
+
+        parsed = parse_multipart(f"multipart/form-data; boundary={boundary}", body)
+        upload = parsed["pcap"]
+
+        self.assertIn("PCAP Analyzer", render_upload_page())
+        self.assertEqual(parsed["host"], "10.0.0.5")
+        self.assertIsInstance(upload, tuple)
+        self.assertEqual(upload[0], "sample.pcap")
+        self.assertEqual(upload[1], b"abc123")
 
 
 if __name__ == "__main__":
